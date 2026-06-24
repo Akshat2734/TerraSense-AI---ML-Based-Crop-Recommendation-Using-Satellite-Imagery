@@ -1,0 +1,6 @@
+# --- UI & Image Handling ---
+PyQt6
+Pillow
+
+# --- Networking ---
+requests

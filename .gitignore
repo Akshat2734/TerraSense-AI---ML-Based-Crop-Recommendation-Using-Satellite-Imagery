@@ -1,0 +1,21 @@
+# Ignore NDVI TIFF file
+field_ndvi.tif
+
+# Ignore model datasets
+server/ml_model/crop-recommendation-dataset/
+server/ml_model/crop-recommendation-using-soil-and-weather/
+server/ml_model/crop-recommender-dataset-with-soil-nutrients/
+
+# Ignore trained models
+server/ml_model/saved_models/
+
+# Ignore soil image datasets
+server/ml_model/soil-image-dataset/
+server/ml_model/soil-types/
+
+# Ignore Python cache
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+gee_keys/

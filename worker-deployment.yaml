@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: terrasense-worker
+spec:
+  replicas: 1 # Start with 1 Chef
+  selector:
+    matchLabels:
+      app: worker
+  template:
+    metadata:
+      labels:
+        app: worker
+    spec:
+      containers:
+      - name: celery-worker
+        image: terrasense/ml-worker:latest
+        command: ["celery", "-A", "services.worker.celery_app", "worker", "--pool=solo"]
+        envFrom:
+        - secretRef:
+            name: terrasense-secrets # Pulls DB and RabbitMQ URLs
+        # 🌟 You MUST define resource requests for HPA to know what "100% CPU" means
+        resources:
+          requests:
+            cpu: "500m" # Half a CPU core
+          limits:
+            cpu: "1000m" # One full CPU core
