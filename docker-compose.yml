@@ -12,13 +12,19 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U terrasense -d terrasense_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   # 2. PgBouncer (Connection Pooling)
   pgbouncer:
     image: edoburu/pgbouncer:latest
     container_name: terrasense-pgbouncer
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     ports:
       - "6432:6432"
     environment:
@@ -26,6 +32,8 @@ services:
       - POOL_MODE=transaction
       - MAX_CLIENT_CONN=1000
       - DEFAULT_POOL_SIZE=20
+      - LISTEN_PORT=6432
+      - AUTH_TYPE=scram-sha-256
 
   # 3. Message Broker & Cache
   rabbitmq:
@@ -85,6 +93,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
+      db:
+        condition: service_healthy
       pgbouncer:
         condition: service_started
     environment:
@@ -94,6 +104,37 @@ services:
       - DATABASE_WRITE_URL=postgresql://terrasense:secretpassword@pgbouncer:6432/terrasense_db
     volumes:
       - ./gee_keys:/root/.config/earthengine:ro
+
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      # It looks in the current root directory (./) for the file
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: terrasense-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin # Default login password
+    depends_on:
+      - prometheus
+
+  # Add this to the bottom of your docker-compose.yml
+  nginx:
+    image: nginx:alpine
+    container_name: terrasense-gateway
+    ports:
+      - "80:80" # Exposes NGINX to your local browser
+    volumes:
+      # Maps your local nginx.conf to the container's configuration folder
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      api:
+        condition: service_started
 
 volumes:
   pgdata:

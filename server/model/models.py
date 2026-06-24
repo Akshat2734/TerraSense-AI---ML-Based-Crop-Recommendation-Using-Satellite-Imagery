@@ -16,10 +16,10 @@ class User(Base):
     predictions = relationship("Prediction", back_populates="user")
 
 class Prediction(Base):
-    __tablename__ = "predictions_partitioned"
+    __tablename__ = "predictions"
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    region = Column(String(50), primary_key=True)
+    region = Column(String(50))
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     
     recommended_crop = Column(String, nullable=False)
