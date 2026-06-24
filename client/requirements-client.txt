@@ -1,6 +1,2 @@
-# --- UI & Image Handling ---
-PyQt6
-Pillow
-
-# --- Networking ---
-requests
+PyQt6==6.6.1
+requests==2.31.0

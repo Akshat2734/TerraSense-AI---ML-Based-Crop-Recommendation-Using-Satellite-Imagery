@@ -5,6 +5,7 @@ from celery.result import AsyncResult
 from datetime import timedelta
 import redis.asyncio as redis
 from prometheus_fastapi_instrumentator import Instrumentator
+from contextlib import asynccontextmanager
 import uvicorn
 import bcrypt
 import hashlib
@@ -16,10 +17,16 @@ from users.auth import verify_token, create_access_token, ACCESS_TOKEN_EXPIRE_MI
 from services.worker import celery_app, process_crop_prediction
 
 # --- NEW: Database Imports ---
-from model.session import get_db, get_read_db
-from model.models import User, Prediction
+from model.session import get_db, get_read_db, engine_replica
+from model.models import User, Prediction, Base
 
-app = FastAPI(title="TerraSense AI REST API")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # 2. Run the heavy CREATE TABLE commands directly against port 5432
+    Base.metadata.create_all(bind=engine_replica)
+    yield
+
+app = FastAPI(title="TerraSense AI REST API", lifespan=lifespan)
 redis_client = redis.Redis(host='redis', port=6379, db=0, decode_responses=True)
 
 class ConnectionManager:
