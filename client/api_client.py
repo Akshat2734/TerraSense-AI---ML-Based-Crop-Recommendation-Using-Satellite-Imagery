@@ -35,7 +35,7 @@ class TerraSenseClient:
             headers=self.headers
         )
         response.raise_for_status()
-        return response.json().get("task_id")
+        return response.json()
 
     def check_task_status(self, task_id: str) -> Dict[str, Any]:
         """
@@ -46,5 +46,11 @@ class TerraSenseClient:
             f"{self.base_url}/api/v1/status/{task_id}", 
             headers=self.headers
         )
+        response.raise_for_status()
+        return response.json()
+    
+    def get_history(self) -> list:
+        """Fetches the prediction history for the logged-in user."""
+        response = requests.get(f"{self.base_url}/api/v1/history", headers=self.headers)
         response.raise_for_status()
         return response.json()

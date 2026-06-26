@@ -87,12 +87,13 @@ def process_crop_prediction(self, payload: dict):
         # Save prediction
         db = SessionLocalPrimary()
 
+        # --- UPDATED DATABASE SAVE ---
         new_prediction = Prediction(
             user_id=payload["user_id"],
             recommended_crop=str(crop_name),
             detected_soil=str(soil_name),
             satellite_ndvi=float(ndvi),
-            location=location_geom
+            location=location_geom,
         )
 
         db.add(new_prediction)
@@ -105,7 +106,7 @@ def process_crop_prediction(self, payload: dict):
             "db_id": new_prediction.id,
             "recommended_crop": str(crop_name),
             "detected_soil": str(soil_name),
-            "ndvi": float(ndvi)
+            "ndvi": float(ndvi),
         }
         
         try:
