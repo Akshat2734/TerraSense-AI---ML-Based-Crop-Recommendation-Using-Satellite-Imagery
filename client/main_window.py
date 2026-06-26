@@ -3,8 +3,7 @@ import base64
 import time
 from PyQt6.QtWidgets import (
     QWidget, QLabel, QPushButton, QFileDialog,
-    QVBoxLayout, QHBoxLayout, QLineEdit,
-    QTextEdit, QApplication, QFrame
+    QVBoxLayout, QHBoxLayout, QLineEdit, QApplication, QFrame, QMessageBox, QScrollArea, QTextEdit
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 from PyQt6.QtGui import QPixmap, QImage
@@ -28,7 +27,18 @@ class PredictionWorker(QThread):
     def run(self):
         try:
             self.progress.emit("Submitting data to server...")
-            task_id = self.client.submit_prediction(self.payload)
+            response_data = self.client.submit_prediction(self.payload)
+            
+            if response_data.get("status") == "SUCCESS" and "data" in response_data:
+                self.progress.emit("Result loaded instantly from Redis cache!")
+                self.finished.emit(response_data["data"])
+                return # Exit early, no polling needed!
+            
+            # Otherwise, it's a new job. Grab the task_id and poll Celery
+            task_id = response_data.get("task_id")
+            if not task_id:
+                self.error.emit("Server did not return a task_id.")
+                return
             
             self.progress.emit("Job queued. Waiting for ML worker...")
             
@@ -51,15 +61,15 @@ class PredictionWorker(QThread):
 # Main GUI Application
 # ---------------------------------------------------------
 class TerraSenseGUI(QWidget):
-    def __init__(self):
+    def __init__(self, api_client, user_email):
         super().__init__()
         
-        # Initialize our HTTP client pointing to NGINX
-        self.client = TerraSenseClient(base_url="http://localhost")
+        self.client = api_client
+        self.user_email = user_email
         self.image_path = None
 
-        self.setWindowTitle("TerraSense AI")
-        self.setMinimumSize(1200, 700)
+        self.setWindowTitle(f"TerraSense AI - Dashboard ({self.user_email})")
+        self.setMinimumSize(1200, 800)
         self.setStyleSheet(self.get_styles())
         self.build_ui()
 
@@ -129,30 +139,61 @@ class TerraSenseGUI(QWidget):
 
     def build_output_panel(self):
         frame = QFrame()
-        layout = QVBoxLayout()
-        layout.setContentsMargins(25, 25, 25, 25)
-        layout.setSpacing(15)
-
-        header = QLabel("Pipeline Results")
+        frame.setObjectName("cardPanel")
+        layout = QVBoxLayout(frame)
+        
+        # Header
+        header = QLabel("Prediction History")
         header.setObjectName("panelHeader")
         layout.addWidget(header)
 
-        # Image preview
-        self.ndvi_image = QLabel("Awaiting data...")
-        self.ndvi_image.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.ndvi_image.setMinimumHeight(350)
-        self.ndvi_image.setObjectName("imagePreview")
-        layout.addWidget(self.ndvi_image)
+        # Refresh Button
+        self.refresh_btn = QPushButton("Refresh History")
+        self.refresh_btn.clicked.connect(self.load_history)
+        layout.addWidget(self.refresh_btn)
 
-        # Output text
+        # Scroll Area for History
+        self.scroll = QScrollArea()
+        self.scroll.setWidgetResizable(True)
+        self.scroll.setObjectName("imagePreview") # Reuse style
+        
+        # Container for the cards
+        self.history_container = QWidget()
+        self.history_layout = QVBoxLayout(self.history_container)
+        self.history_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+        
         self.output_text = QTextEdit()
         self.output_text.setReadOnly(True)
-        self.output_text.setPlaceholderText("Telemetry and model output will appear here...")
         layout.addWidget(self.output_text)
+        
+        self.scroll.setWidget(self.history_container)
+        layout.addWidget(self.scroll)
 
-        frame.setLayout(layout)
-        frame.setObjectName("cardPanel")
         return frame
+
+    def load_history(self):
+        # Clear existing
+        for i in reversed(range(self.history_layout.count())): 
+            self.history_layout.itemAt(i).widget().setParent(None)
+
+        try:
+            history = self.client.get_history()
+            for p in history:
+                # Create a card for each prediction
+                card = QFrame()
+                card.setStyleSheet("background: #ffffff; border: 1px solid #e2e8f0; border-radius: 5px;")
+                card_layout = QVBoxLayout(card)
+                
+                info = QLabel(
+                    f"<b>Crop:</b> {p['crop'].capitalize()}<br>"
+                    f"<b>Soil:</b> {p['soil'].capitalize()}<br>"
+                    f"<b>NDVI:</b> {p['ndvi']:.3f}<br>"
+                    f"<b>Date:</b> {p['date']}"
+                )
+                card_layout.addWidget(info)
+                self.history_layout.addWidget(card)
+        except Exception as e:
+            self.history_layout.addWidget(QLabel(f"Could not load history: {e}"))
 
     def create_input(self, layout, label_text, placeholder):
         row = QHBoxLayout()
@@ -224,17 +265,12 @@ class TerraSenseGUI(QWidget):
                 self.ndvi_image.setStyleSheet("border: none;")
 
         text = f"""
-        <b>ANALYSIS COMPLETE</b>
-        ----------------------------------
-        <b>Detected Soil:</b> {result.get('soil', 'N/A')}
-        <b>Recommended Crop:</b> <span style='color: #2e7d32; font-weight: bold;'>{result.get('crop', 'N/A')}</span>
-        <b>NDVI Value:</b> {result.get('ndvi', 0.0):.3f}
-        
-        <i>Environmental Metrics:</i>
-        Temperature: {result.get('temp', 'N/A')} °C
-        Humidity: {result.get('humidity', 'N/A')} %
-        Rainfall: {result.get('rainfall', 'N/A')} mm
-        """
+            <b>ANALYSIS COMPLETE</b><br>
+            ----------------------------------<br>
+            <b>Detected Soil:</b> {result.get('detected_soil', 'N/A').upper()}<br>
+            <b>Recommended Crop:</b> <span style='color: #2e7d32; font-weight: bold;'>{result.get('recommended_crop', 'N/A').upper()}</span><br>
+            <b>NDVI Value:</b> {result.get('ndvi', 0.0):.3f}
+            """
         self.output_text.setHtml(text)
 
     def show_error(self, msg):
@@ -334,10 +370,115 @@ class TerraSenseGUI(QWidget):
             background-color: #f8fafc;
             color: #94a3b8;
         }
+        
+        QWidget {
+            background-color: #f8fafc;
+            color: #0f172a; /* Force dark text globally */
+            font-size: 14px;
+        }
+        
+        QTextEdit {
+            background-color: #ffffff;
+            color: #0f172a; /* Explicitly set text color */
+            border: 1px solid #cbd5e1;
+            padding: 10px;
+        }
+
+        QFrame#cardPanel {
+            background-color: #ffffff;
+            color: #0f172a;
+            border: 1px solid #e2e8f0;
+        }
+
+        QLabel {
+            color: #0f172a;
+        }
         """
+        
+class LoginWindow(QWidget):
+        login_successful = pyqtSignal(str)
+        def __init__(self, api_client=None):
+            super().__init__()
+            self.api_client = api_client or TerraSenseClient(base_url="http://localhost:8000")
+            
+            self.setWindowTitle("TerraSense AI - Authentication")
+            self.resize(450, 500)
+            self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+            self.setStyleSheet(TerraSenseGUI(None, "").get_styles()) # Inherit styles
+
+            layout = QVBoxLayout(self)
+            layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            
+            # Build the card
+            frame = QFrame()
+            frame.setObjectName("cardPanel")
+            frame.setFixedSize(400, 350)
+            
+            frame_layout = QVBoxLayout(frame)
+            frame_layout.setContentsMargins(30, 30, 30, 30)
+            frame_layout.setSpacing(20)
+
+            # Logo / Title
+            logo = QLabel("TerraSense AI")
+            logo.setObjectName("title")
+            logo.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            frame_layout.addWidget(logo)
+
+            # Inputs
+            self.email_input = QLineEdit()
+            self.email_input.setPlaceholderText("Email Address")
+            frame_layout.addWidget(self.email_input)
+            
+            self.password_input = QLineEdit()
+            self.password_input.setPlaceholderText("Password")
+            self.password_input.setEchoMode(QLineEdit.EchoMode.Password)
+            frame_layout.addWidget(self.password_input)
+
+            frame_layout.addSpacing(10)
+
+            # Buttons
+            self.sign_in_btn = QPushButton("Sign In")
+            self.sign_in_btn.setObjectName("primaryButton")
+            self.sign_in_btn.clicked.connect(self.sign_in)
+            frame_layout.addWidget(self.sign_in_btn)
+            
+            layout.addWidget(frame)
+
+        def sign_in(self):
+            email = self.email_input.text().strip()
+            password = self.password_input.text().strip()
+            
+            if not email or not password:
+                QMessageBox.warning(self, "Input Error", "Please enter both email and password.")
+                return
+
+            self.sign_in_btn.setEnabled(False)
+            self.sign_in_btn.setText("Authenticating...")
+            QApplication.processEvents()
+
+            try:
+                # Authenticate against the backend
+                success = self.api_client.login(email, password)
+                if success:
+                    self.route_user(email)
+                else:
+                    QMessageBox.warning(self, "Sign In Failed", "Invalid credentials. Please try again.")
+            except Exception as e:
+                QMessageBox.critical(self, "Connection Error", f"Failed to connect to server:\n{str(e)}")
+            finally:
+                self.sign_in_btn.setEnabled(True)
+                self.sign_in_btn.setText("Sign In")
+
+        def route_user(self, email):
+            # Instantiate the main dashboard, passing the authenticated client
+            self.app_window = TerraSenseGUI(self.api_client, email)
+            self.app_window.show()
+            
+            # Close the login window
+            self.close()
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    window = TerraSenseGUI()
+    window = LoginWindow()
     window.show()
     sys.exit(app.exec())
