@@ -50,22 +50,22 @@ and PostGIS provide a scalable backend.
 
 ------------------------------------------------------------------------
 
-# 🚀 Features
+## 🌟 Core Features
+* **Desktop Client Interface:** A PyQt6-based desktop application featuring a responsive, card-based UI for submitting field data and visualizing predictions.
+* **Geospatial Tracking:** Utilizes PostGIS and GeoAlchemy2 to map and store strict spatial polygon data (WGS 84 / SRID 4326) for every prediction.
+* **Earth Engine Integration:** Dynamically fetches NDVI (Normalized Difference Vegetation Index) and bounding box coordinates based on latitude, longitude, and acreage.
+* **Instant Result Caching:** Identical spatial requests are cached in Redis for 24 hours, allowing the API to return instant results without waking the ML workers.
 
--   PyQt6 desktop client
--   FastAPI backend
--   EfficientNet-B0 soil classifier
--   LightGBM crop recommendation
--   Google Earth Engine NDVI retrieval
--   NASA POWER weather integration
--   PostGIS polygon storage
--   Redis caching (24-hour TTL)
--   RabbitMQ task queue
--   Celery background workers
--   WebSocket live updates
--   Docker Compose deployment
--   Prometheus & Grafana monitoring
--   Database Scalabity using Kubernetics
+## 🧠 Machine Learning Architecture
+The platform employs a two-stage inference pipeline:
+1.  **Computer Vision (Soil Classification):** A PyTorch EfficientNet-B0 model extracts features from user-uploaded satellite or ground images to classify the soil type.
+2.  **Tabular Prediction (Crop Recommendation):** A LightGBM pipeline takes the one-hot encoded soil classification from the CNN, concatenates it with scaled numerical data (Nitrogen, Phosphorus, Potassium, pH, Temperature, Humidity, Rainfall), and outputs the optimal crop.
+
+## 🚀 Scalability & Performance Features
+* **Connection Pooling:** PgBouncer sits in front of the PostGIS database, capping maximum client connections to 1000 while maintaining a default transaction pool size of 20, preventing database connection exhaustion during traffic spikes.
+* **Asynchronous Processing:** Heavy ML inference tasks are offloaded from the FastAPI web server to Celery workers via a RabbitMQ message broker. 
+* **Kubernetes HPA Readiness:** The worker deployment defines strict CPU resource limits (requests: 500m, limits: 1000m), making it fully compatible with Kubernetes Horizontal Pod Autoscalers (HPA).
+* **Database Retry Mechanisms:** The Celery worker implements transactional integrity by catching `OperationalError` and `PendingRollbackError` exceptions, rolling back the session, and utilizing Celery's built-in retry mechanism to handle transient database locks.
 
 ------------------------------------------------------------------------
 
