@@ -5,11 +5,19 @@
 > Docker, and Nginx**.
 
 ![Python](https://img.shields.io/badge/Python-3.11-blue)
-![FastAPI](https://img.shields.io/badge/FastAPI-Backend-green)
-![Docker](https://img.shields.io/badge/Docker-Containerized-blue)
-![Redis](https://img.shields.io/badge/Redis-Cache-red)
-![RabbitMQ](https://img.shields.io/badge/RabbitMQ-Queue-orange)
-![PostGIS](https://img.shields.io/badge/PostGIS-Geospatial-success)
+![FastAPI](https://img.shields.io/badge/FastAPI-Backend-009688?logo=fastapi&logoColor=white)
+![PyTorch](https://img.shields.io/badge/PyTorch-Deep%20Learning-EE4C2C?logo=pytorch&logoColor=white)
+![LightGBM](https://img.shields.io/badge/LightGBM-ML-success)
+![Docker](https://img.shields.io/badge/Docker-Containerized-2496ED?logo=docker&logoColor=white)
+![Kubernetes](https://img.shields.io/badge/Kubernetes-Ready-326CE5?logo=kubernetes&logoColor=white)
+![RabbitMQ](https://img.shields.io/badge/RabbitMQ-Message%20Broker-FF6600?logo=rabbitmq&logoColor=white)
+![Redis](https://img.shields.io/badge/Redis-Cache-DC382D?logo=redis&logoColor=white)
+![PostGIS](https://img.shields.io/badge/PostGIS-Geospatial-336791?logo=postgresql&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Database-4169E1?logo=postgresql&logoColor=white)
+![Celery](https://img.shields.io/badge/Celery-Workers-37814A?logo=celery&logoColor=white)
+![Nginx](https://img.shields.io/badge/Nginx-Reverse%20Proxy-009639?logo=nginx&logoColor=white)
+![Prometheus](https://img.shields.io/badge/Prometheus-Monitoring-E6522C?logo=prometheus&logoColor=white)
+![Grafana](https://img.shields.io/badge/Grafana-Dashboards-F46800?logo=grafana&logoColor=white)
 
 ------------------------------------------------------------------------
 
@@ -57,6 +65,7 @@ and PostGIS provide a scalable backend.
 -   WebSocket live updates
 -   Docker Compose deployment
 -   Prometheus & Grafana monitoring
+-   Database Scalabity using Kubernetics
 
 ------------------------------------------------------------------------
 
@@ -272,7 +281,7 @@ README.md
   Queue        RabbitMQ
   Workers      Celery
   Gateway      Nginx
-  DevOps       Docker Compose
+  DevOps       Docker, Kubernetics
   Monitoring   Prometheus, Grafana
 
 ------------------------------------------------------------------------
